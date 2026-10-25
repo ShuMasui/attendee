@@ -1,0 +1,891 @@
+\documentclass[platex,dvipdfmx,12pt]{jsarticle}
+%使ってるのがplatexだからクラス指定はplatex.間違えてもuplatexにしないように
+
+%==============================================================================
+% 要件定義書テンプレート
+%   土台 : kosen-report-writer の latex_snipets.json (reportTemplate) のプリアンブル
+%   再現 : 要件定義書サンプル.pdf（表紙／改訂履歴／目次／1.概要〜5.補足／以上）
+%
+% ■ビルド
+%   latexmk -outdir=latex-output requirements-template.tex
+%   （.latexmkrc により platex → pbibtex → platex → dvipdfmx で処理される）
+%
+% ■記入ルール（後続チャットで内容を当てはめる際の約束事）
+%   ・【...】 が差し替え対象のプレースホルダ．記入したら【】ごと消す
+%   ・章(\section)・節(\subsection)・■見出し(\reqlabel)の構成はサンプルに準拠．
+%     不要な ■ブロックは丸ごと削除，足りなければ複製してよい
+%   ・表の行は「セル & セル \\ \hline」．行は必要なだけ増減する（最終行にも \\ \hline）
+%   ・セル内の箇条書きは「・項目1\par・項目2」のように \par で区切る
+%   ・本文の箇条書きは reqbullet 環境
+%   ・図は assets/ に置き，\reqimage{assets/ファイル名} を差し替える
+%     （ファイルが無い間は「※図を添付」の枠が出る．ファイル名に _ は使わない）
+%   ・句読点はサンプルに合わせて「、。」
+%   ・特殊文字は \% \& \_ \# \$ とエスケープ．丸数字などは \ajMaru{1}（otf）
+%   ・ファイル名などをインラインで書くときは \texttt を使わずそのまま書く
+%
+% ■独自マクロ一覧（プリアンブルで定義）
+%   \reqlabel{名前}       ■見出し。直後に \begin{...}（表）が続くときは表の先頭行に組み込まれ，
+%                         見出しだけがページ末に取り残されない（段落が続くときは単独の見出し）
+%   \reqth{文字}          表ヘッダー用（白・太字）
+%   \reqimage[幅]{パス}    画像．無ければ枠表示
+%   reqbullet 環境        本文の「・」箇条書き（\item で項目）
+%   reqtable 環境         ヘッダー付き表   \begin{reqtable}{列指定}{ヘッダー行}
+%   reqlist 環境          ヘッダー無しの2列表（項目名＋値）\begin{reqlist}{列指定}
+%   reqcategory 環境      カテゴリー | 詳細 の表（1章）
+%   reqitems 環境         項目 | 説明 | 具体的な要件 の表（4章）
+%   列指定 : K{比率}=太字ゴシックの項目列  P{比率}=通常列  M{比率}=中央揃え列
+%            比率は表幅に対する割合で，合計が 1 になるようにする（例 K{.3}P{.7}）
+%==============================================================================
+
+\usepackage{graphicx}
+\usepackage[hyphens]{url}
+\usepackage{otf}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{here}
+\usepackage{geometry}
+\usepackage{ascmac}
+
+\usepackage[hang,small,bf]{caption}
+\usepackage[subrefformat=parens]{subcaption}
+\captionsetup{compatibility=false}
+\usepackage{textcomp}
+
+\usepackage{listings} %日本語のコメントアウトをする場合jvlisting（もしくはjlisting）が必要
+%ここからソースコードの表示に関する設定
+\lstset{
+  basicstyle={\ttfamily},              % 基本:等幅フォント
+  identifierstyle={\small},            % 識別子
+  commentstyle={\smallitshape},        % コメント:斜体
+  keywordstyle={\small\bfseries},     % キーワード:太字
+  stringstyle={\small\ttfamily},      % 文字列
+  frame={tb},                           % 上部と下部に線を表示
+  breaklines=true,                      % 行が長い場合に折り返す
+  columns=[l]{fullflexible},            % 列幅を自動調整する（見た目が良くなる）
+  numbers=left,                         % 行番号を左側に表示
+  xrightmargin=0zw,                     % 右マージンのサイズ．
+  xleftmargin=1.6zw,                    % 左マージンのサイズ．行番号が2桁でも行左端からはみ出ない値．
+  numberstyle={\scriptsize},           % 行番号のスタイル．スクリプトサイズのフォントを使用
+  stepnumber=1,                         % 何行ごとに行番号を表示するか
+  numbersep=1zw,                        % 行番号とソースコードの間の距離
+  lineskip=-1.4ex,                      % ソースコードの行間（結構詰め気味）
+  morestring=[b]",                     %日本語等のStringを正常にダブルクオーテーションで囲む
+  showstringspaces=false,               %Stringに囲まれた部分ではスペースがSymbol付きで表示されるのでそれを消す
+}
+\renewcommand{\lstlistingname}{ソースコード}
+
+\geometry{left=20mm,right=20mm,top=20mm,bottom=30mm}
+\renewcommand{\baselinestretch}{1.2}
+
+%------------------------------------------------------------------------------
+% ここから要件定義書用の追加（上までがスキル標準のプリアンブル）
+%   longtable : ページをまたぐ長い表（ヘッダー行を各ページに再掲）
+%   needspace : 見出し・■見出しだけがページ末尾に取り残されるのを防ぐ
+%   xcolor[table] : サンプルの水色ヘッダー・縞模様・青枠のための色指定
+%------------------------------------------------------------------------------
+\usepackage{longtable}
+\usepackage{needspace}
+\usepackage[table]{xcolor}
+
+% サンプルPDFの配色
+\definecolor{reqblue}{RGB}{68,114,196}   % 表紙の枠・見出しの青
+\definecolor{reqbox}{RGB}{217,226,243}   % 章見出しの塗り
+\definecolor{reqhead}{RGB}{91,155,213}   % 表ヘッダー
+\definecolor{reqlight}{RGB}{222,234,246} % 表の縞（薄い水色）
+\definecolor{reqrule}{RGB}{157,195,230}  % 表の罫線
+
+\makeatletter %sectionをchapterっぽくする.
+% 見出し番号を「1.」「(1)」形式にする（サンプルPDFに合わせた設定）．
+% スキル標準の「第1章」形式にする場合は pre=第 / post=章 に戻し，\thesubsection の行を削除する
+\renewcommand{\presectionname}{}
+\renewcommand{\postsectionname}{.}%はコメントですがつけ忘れると\section*でバグります
+\renewcommand{\thesubsection}{(\arabic{subsection})}
+
+% 図番号を1.5のようにする
+\renewcommand{\theequation}{\arabic{section}.\arabic{equation}}
+\renewcommand{\thefigure}{\arabic{section}.\arabic{figure}}
+\renewcommand{\thetable}{\arabic{section}.\arabic{table}}
+% jsarticle は章ごとにカウンタがリセットされないため追加（無いと2章の最初の図が「図2.2」になる）
+\@addtoreset{equation}{section}
+\@addtoreset{figure}{section}
+\@addtoreset{table}{section}
+
+% 章見出し : 青枠＋薄青塗りのボックス（スタイル末尾のマクロが見出し全体を受け取る）
+\newcommand{\reqsectionbox}[1]{%
+  \begingroup\setlength{\fboxrule}{1.6pt}\setlength{\fboxsep}{5pt}%
+  \noindent\fcolorbox{reqblue}{reqbox}{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}{\raggedright #1}}%
+  \endgroup}
+% 節見出し : 左に青いバー，下に青い罫線
+\newcommand{\reqsubsectionbox}[1]{%
+  \noindent\textcolor{reqblue}{\rule[-.8ex]{.5zw}{3ex}}\hspace{.5zw}%
+  \begin{minipage}[t]{\dimexpr\linewidth-1zw\relax}\raggedright #1\end{minipage}\par\nobreak
+  \vspace{-.7\baselineskip}\noindent\textcolor{reqblue}{\rule{\linewidth}{1.2pt}}\par}
+
+\renewcommand{\section}{%
+\clearpage
+\@startsection{section}{1}{\z@}%
+{\Cvs \@plus.5\Cdp \@minus.2\Cdp}% 見出し前に付けられる空白量
+{.5\Cvs \@plus.3\Cdp}% 見出し後に付けられる垂直方向の空白量
+{\normalfont\Large\headfont\reqsectionbox}}% 見出しのスタイル
+\renewcommand{\subsection}{%
+\Needspace{6\baselineskip}%
+\@startsection{subsection}{2}{\z@}%
+{\Cvs \@plus.5\Cdp \@minus.2\Cdp}%
+{.5\Cvs \@plus.3\Cdp}%
+{\normalfont\large\headfont\reqsubsectionbox}}
+\makeatother
+
+\renewcommand{\contentsname}{目次}
+\setcounter{tocdepth}{2}
+
+\makeatletter
+% 表の列数を数える（列指定 K{..}P{..}M{..} の文字数）
+\newcount\req@ncols
+\newcommand{\req@countcols}[1]{\req@ncols\z@
+  \@tfor\req@t:=#1\do{%
+    \def\req@a{K}\ifx\req@t\req@a\advance\req@ncols\@ne\fi
+    \def\req@a{P}\ifx\req@t\req@a\advance\req@ncols\@ne\fi
+    \def\req@a{M}\ifx\req@t\req@a\advance\req@ncols\@ne\fi}}
+
+% ■見出し
+%   直後が \begin{...}（表）のときは見出しを表の先頭行に組み込む（見出しだけがページ末に取り残されない）。
+%   表が続かないとき（段落が続くとき）は単独の見出しとして出す。
+\def\req@label{}
+\newcommand{\req@plainlabel}[1]{\par\Needspace{4\baselineskip}\medskip\noindent ■#1\par\nopagebreak\smallskip}
+\newcommand{\reqlabel}[1]{\@ifnextchar\begin{\gdef\req@label{#1}}{\req@plainlabel{#1}}}
+\newcommand{\req@labelrow}{\ifx\req@label\@empty\else
+  \multicolumn{\the\req@ncols}{@{}l@{}}{■\req@label}\\[.6ex]\fi}
+
+% 本文の「・」箇条書き
+\newenvironment{reqbullet}{%
+  \begin{list}{・}{\setlength{\leftmargin}{1.5zw}\setlength{\labelwidth}{1zw}\setlength{\labelsep}{.5zw}%
+    \setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\setlength{\topsep}{.3\baselineskip}}%
+}{\end{list}}
+
+% 画像（ファイルが無い間はテンプレート単体でコンパイルが通るよう枠を表示する）
+\newcommand{\reqimage}[2][.9\textwidth]{%
+  \IfFileExists{#2}%
+    {\includegraphics[width=#1]{#2}}%
+    {\fbox{\parbox[c][5cm][c]{\dimexpr#1-2\fboxsep-2\fboxrule\relax}{\centering ※図を添付（\detokenize{#2}）}}}}
+
+% 表 : 列指定。比率は表幅に対する割合（セル余白と罫線ぶんを差し引いて表幅ぴったりに収める）
+%   K・P列は左揃え（\raggedright）。狭い列で両端揃えにすると字間が不自然に空くため
+\newcommand{\reqth}[1]{\textcolor{white}{\bfseries #1}}
+\newcolumntype{K}[1]{|>{\bfseries\gtfamily\raggedright\arraybackslash}p{\dimexpr#1\dimexpr\linewidth-\arrayrulewidth\relax-2\tabcolsep-\arrayrulewidth\relax}}
+\newcolumntype{P}[1]{|>{\raggedright\arraybackslash}p{\dimexpr#1\dimexpr\linewidth-\arrayrulewidth\relax-2\tabcolsep-\arrayrulewidth\relax}}
+\newcolumntype{M}[1]{|>{\centering\arraybackslash}p{\dimexpr#1\dimexpr\linewidth-\arrayrulewidth\relax-2\tabcolsep-\arrayrulewidth\relax}}
+
+% ヘッダー付き表（最初のデータ行が薄水色の縞模様）。直前の \reqlabel は先頭行として組み込まれる
+\newenvironment{reqtable}[2]{%
+  \par\smallskip\small
+  \renewcommand{\arraystretch}{1.25}%
+  \req@countcols{#1}%
+  \arrayrulecolor{reqrule}%
+  \ifx\req@label\@empty\rowcolors{2}{reqlight}{white}\else\rowcolors{2}{white}{reqlight}\fi% 先頭用・継続用ヘッダーの2行ぶんを数えたうえで，最初のデータ行が水色になる向き
+  \begin{longtable}{#1|}
+  \req@labelrow
+  \hline
+  \rowcolor{reqhead}#2\\
+  \hline
+  \endfirsthead
+  \hline
+  \rowcolor{reqhead}#2\\
+  \hline
+  \endhead
+}{%
+  \end{longtable}\gdef\req@label{}\par\smallskip}
+% ヘッダー無しの表（項目名＋値）
+\newenvironment{reqlist}[1]{%
+  \par\smallskip\small
+  \renewcommand{\arraystretch}{1.25}%
+  \req@countcols{#1}%
+  \arrayrulecolor{reqrule}%
+  \ifx\req@label\@empty\rowcolors{1}{reqlight}{white}\else\rowcolors{2}{white}{reqlight}\fi
+  \begin{longtable}{#1|}
+  \req@labelrow
+  \hline
+  \endfirsthead
+  \hline
+  \endhead
+}{%
+  \end{longtable}\gdef\req@label{}\par\smallskip}
+% よく使う表のプリセット
+\newenvironment{reqcategory}{%
+  \begin{reqtable}{K{.3}P{.7}}{\reqth{カテゴリー} & \reqth{詳細}}}{\end{reqtable}}
+\newenvironment{reqitems}{%
+  \begin{reqtable}{K{.25}P{.38}P{.37}}{\reqth{項目} & \reqth{説明} & \reqth{具体的な要件}}}{\end{reqtable}}
+\makeatother
+
+
+\begin{document}
+
+%==============================================================================
+% 表紙
+%==============================================================================
+\begin{titlepage}
+\begin{center}
+\vspace*{6em}
+{\LARGE －【文書の副題】－}% サンプル: －要件定義書サンプル－
+
+\vspace{6em}
+\begingroup\setlength{\fboxrule}{3pt}\setlength{\fboxsep}{0pt}%
+\fcolorbox{reqblue}{white}{\parbox[c][.26\textheight][c]{.72\textwidth}{\centering
+{\huge\headfont 【システム名】}\\[.6em]
+{\huge\headfont 要件定義書}}}
+\endgroup
+
+\vspace{9em}
+{\Large 【YYYY年mm月dd日】}
+
+\vspace{1.5em}
+{\Large 【組織名・作成者】}
+\end{center}
+
+% 学校提出用に所属・氏名などが必要な場合は，スキル標準の表紙の書式で以下を追加する
+%\vspace{4em}
+%\begin{LARGE}
+%\begin{flushright}
+%【学年】情報工学科 【番号】番 \linebreak \vspace{1em}
+%【氏名】
+%\end{flushright}
+%\end{LARGE}
+%\vspace{2em}
+%\begin{Large}
+%\begin{tabular}{ll}
+%提出期限 : & 【YYYY年MM月DD日（曜）hh:mm】 \\
+%提出日 : & 【YYYY年MM月DD日（曜）hh:mm】
+%\end{tabular}
+%\end{Large}
+\end{titlepage}
+\setcounter{page}{2}% サンプルPDFに合わせ，表紙を1ページ目として数える（目次のページ番号がサンプルと同じ並びになる）
+
+%==============================================================================
+% 改訂履歴（サンプルp.2）
+%==============================================================================
+\section*{改訂履歴}
+\begin{reqtable}{P{.18}P{.22}P{.28}P{.32}}{\reqth{バージョン} & \reqth{日付} & \reqth{改訂者} & \reqth{改訂内容}}
+【1.0】 & 【日付】 & 【組織名】\par 氏名：【氏名】 & 【新規作成】 \\ \hline
+ & & & \\ \hline
+ & & & \\ \hline
+ & & & \\ \hline
+ & & & \\ \hline
+\end{reqtable}
+
+%==============================================================================
+% 目次（サンプルp.3-4）
+%==============================================================================
+\tableofcontents
+
+%==============================================================================
+% 1. 概要（サンプルp.5-6）
+%==============================================================================
+\section{概要}
+
+\subsection{システム化の目的}
+\begin{reqbullet}
+  \item 【システム化の目的1】
+  \item 【システム化の目的2】
+  \item 【システム化の目的3】
+\end{reqbullet}
+
+\subsection{現状の課題}
+\begin{reqcategory}
+【課題の分類1】 & ・【課題の詳細1】\par・【課題の詳細2】 \\ \hline
+【課題の分類2】 & ・【課題の詳細1】\par・【課題の詳細2】 \\ \hline
+【課題の分類3】 & ・【課題の詳細1】\par・【課題の詳細2】 \\ \hline
+\end{reqcategory}
+
+\subsection{プロジェクトの背景}
+\begin{reqcategory}
+【背景の分類1】 & ・【背景の詳細1】\par・【背景の詳細2】 \\ \hline
+【背景の分類2】 & ・【背景の詳細1】\par・【背景の詳細2】 \\ \hline
+【背景の分類3】 & ・【背景の詳細1】\par・【背景の詳細2】 \\ \hline
+\end{reqcategory}
+
+\subsection{システム構成図}
+【システム名】の全体構成図を図\ref{fig:system-architecture}に示す。
+
+\begin{figure}[H]
+  \begin{center}
+    \reqimage{assets/system-architecture.png}
+    \caption{【システム名】の全体構成図}
+    \label{fig:system-architecture}
+  \end{center}
+\end{figure}
+
+\subsection{用語定義}
+\begin{reqcategory}
+【用語1】 & 【用語1の定義】 \\ \hline
+【用語2】 & 【用語2の定義】 \\ \hline
+【用語3】 & 【用語3の定義】 \\ \hline
+\end{reqcategory}
+
+%==============================================================================
+% 2. 業務要件（サンプルp.7-11）
+%==============================================================================
+\section{業務要件}
+
+\subsection{業務要件一覧}
+本【システム名】は、以下の業務を実現するものとする。
+
+\reqlabel{顧客対応業務}% 業務区分ごとに ■ブロックを増減する（サンプル: 顧客対応業務／内部業務／システム管理業務）
+\begin{reqtable}{K{.22}P{.34}P{.24}M{.20}}{\reqth{業務} & \reqth{詳細} & \reqth{実施者} & \reqth{システム化対象}}
+【業務名1】 & 【業務の詳細】 & 【実施者1】\par【実施者2】 & ○ \\ \hline
+【業務名2】 & 【業務の詳細】 & 【実施者】 & \\ \hline% システム化対象外は空欄
+\end{reqtable}
+
+\reqlabel{内部業務}
+\begin{reqtable}{K{.22}P{.34}P{.24}M{.20}}{\reqth{業務} & \reqth{詳細} & \reqth{実施者} & \reqth{システム化対象}}
+【業務名1】 & 【業務の詳細】 & 【実施者】 & ○ \\ \hline
+\end{reqtable}
+
+\reqlabel{システム管理業務}
+\begin{reqtable}{K{.22}P{.34}P{.24}M{.20}}{\reqth{業務} & \reqth{詳細} & \reqth{実施者} & \reqth{システム化対象}}
+【業務名1】 & 【業務の詳細】 & 【実施者】 & \\ \hline
+\end{reqtable}
+
+\subsection{業務フロー図}
+% サンプルの注記: 赤枠で囲むなどして、システム化範囲を明確にすること
+\begin{figure}[H]
+  \begin{center}
+    \reqimage{assets/business-flow.png}
+    \caption{業務フロー図}
+    \label{fig:business-flow}
+  \end{center}
+\end{figure}
+
+\subsection{規模}
+\reqlabel{データ件数・サービス利用者数}
+\begin{reqlist}{K{.4}P{.6}}
+【項目1】 & 【値・説明】 \\ \hline
+【項目2】 & 【値・説明】 \\ \hline
+【項目3】 & 【値・説明】 \\ \hline
+\end{reqlist}
+
+\reqlabel{【取り扱い対象の規模】}% サンプル: 商品・サービスの取り扱い
+\begin{reqlist}{K{.4}P{.6}}
+【項目1】 & 【値・説明】 \\ \hline
+【項目2】 & 【値・説明】 \\ \hline
+\end{reqlist}
+
+\reqlabel{【業務固有の規模】}% サンプル: オペレーターのエスカレーション処理
+\begin{reqlist}{K{.4}P{.6}}
+【項目1】 & 【値・説明】 \\ \hline
+【項目2】 & 【値・説明】 \\ \hline
+\end{reqlist}
+
+\reqlabel{システムの規模}
+\begin{reqlist}{K{.4}P{.6}}
+【項目1】 & 【値・説明】 \\ \hline
+【項目2】 & 【値・説明】 \\ \hline
+\end{reqlist}
+
+\subsection{場所}
+【システムを利用する場所（例：社内・社外）】
+
+\subsection{時期・時間}
+\begin{reqlist}{K{.4}P{.6}}
+システム稼働時間 & 【稼働時間】 \\ \hline
+メンテナンス & 【メンテナンスの時期・時間】 \\ \hline
+アクセスのピーク & 【ピーク時間帯】 \\ \hline
+【その他の項目】 & 【値・説明】 \\ \hline
+\end{reqlist}
+
+\subsection{指標}
+\reqlabel{パフォーマンス指標}
+\begin{reqlist}{K{.4}P{.6}}
+【指標名】 & 【目標値・説明】 \\ \hline
+\end{reqlist}
+
+\reqlabel{利用状況指標}
+\begin{reqlist}{K{.4}P{.6}}
+【指標名】 & 【目標値・説明】 \\ \hline
+\end{reqlist}
+
+\reqlabel{品質管理指標}
+\begin{reqlist}{K{.4}P{.6}}
+【指標名】 & 【目標値・説明】 \\ \hline
+\end{reqlist}
+
+\reqlabel{セキュリティ指標}
+\begin{reqlist}{K{.4}P{.6}}
+【指標名】 & 【目標値・説明】 \\ \hline
+\end{reqlist}
+
+\reqlabel{拡張性指標}
+\begin{reqlist}{K{.4}P{.6}}
+【指標名】 & 【目標値・説明】 \\ \hline
+\end{reqlist}
+
+\subsection{システム化範囲}
+\begin{figure}[H]
+  \begin{center}
+    \reqimage{assets/system-scope.png}
+    \caption{システム化範囲}
+    \label{fig:system-scope}
+  \end{center}
+\end{figure}
+
+\reqlabel{システム化の対象範囲}
+\begin{reqtable}{K{.3}P{.7}}{\reqth{業務} & \reqth{内容}}
+【業務区分1】 & ○【業務名1】\par○【業務名2】 \\ \hline
+【業務区分2】 & ○【業務名1】\par○【業務名2】 \\ \hline
+\end{reqtable}
+
+\reqlabel{システム化の対象外範囲}
+\begin{reqtable}{K{.3}P{.7}}{\reqth{業務} & \reqth{内容}}
+【業務区分1】 & ○【業務名1】\par○【業務名2】 \\ \hline
+\end{reqtable}
+
+%==============================================================================
+% 3. 機能要件（サンプルp.12-17）
+%==============================================================================
+\section{機能要件}
+
+\subsection{機能一覧}
+\reqlabel{基本機能}
+\begin{reqtable}{K{.25}P{.40}P{.35}}{\reqth{機能} & \reqth{説明} & \reqth{対応業務要件}}
+【機能名1】 & 【機能の説明】 & ○【対応する業務要件1】\par○【対応する業務要件2】 \\ \hline
+【機能名2】 & 【機能の説明】 & ○【対応する業務要件】 \\ \hline
+\end{reqtable}
+
+\reqlabel{拡張機能}
+\begin{reqtable}{K{.25}P{.40}P{.35}}{\reqth{機能} & \reqth{説明} & \reqth{対応業務要件}}
+【機能名1】 & 【機能の説明】 & ○【対応する業務要件】 \\ \hline
+\end{reqtable}
+
+\subsection{画面}
+\reqlabel{【利用者区分1】向け画面}% サンプル: 顧客向け画面／オペレーター向け画面／管理者向け画面
+\begin{reqtable}{K{.3}P{.7}}{\reqth{画面名} & \reqth{説明}}
+【画面名1】 & 【画面の説明】 \\ \hline
+【画面名2】 & 【画面の説明】 \\ \hline
+\end{reqtable}
+
+\reqlabel{【利用者区分2】向け画面}
+\begin{reqtable}{K{.3}P{.7}}{\reqth{画面名} & \reqth{説明}}
+【画面名1】 & 【画面の説明】 \\ \hline
+\end{reqtable}
+
+\reqlabel{【利用者区分3】向け画面}
+\begin{reqtable}{K{.3}P{.7}}{\reqth{画面名} & \reqth{説明}}
+【画面名1】 & 【画面の説明】 \\ \hline
+\end{reqtable}
+
+\subsection{帳票}
+\reqlabel{【帳票区分1】}% サンプル: レポート帳票／顧客向け帳票／管理者向け帳票
+\begin{reqtable}{K{.3}P{.7}}{\reqth{帳票名} & \reqth{内容}}
+【帳票名1】 & 【帳票の内容】 \\ \hline
+\end{reqtable}
+
+\reqlabel{【帳票区分2】}
+\begin{reqtable}{K{.3}P{.7}}{\reqth{帳票名} & \reqth{内容}}
+【帳票名1】 & 【帳票の内容】 \\ \hline
+\end{reqtable}
+
+\reqlabel{【帳票区分3】}
+\begin{reqtable}{K{.3}P{.7}}{\reqth{帳票名} & \reqth{内容}}
+【帳票名1】 & 【帳票の内容】 \\ \hline
+\end{reqtable}
+
+\subsection{情報・データ}
+% サンプルの注記: 必要に応じて ER 図を添付
+\begin{figure}[H]
+  \begin{center}
+    \reqimage{assets/er-diagram.png}
+    \caption{ER図}
+    \label{fig:er-diagram}
+  \end{center}
+\end{figure}
+
+\begin{reqtable}{K{.3}P{.7}}{\reqth{情報・データ名} & \reqth{内容}}
+【データ名1】 & 【データの内容】 \\ \hline
+【データ名2】 & 【データの内容】 \\ \hline
+\end{reqtable}
+
+\subsection{外部インターフェース}
+\reqlabel{【連携先の分類1】}% サンプル: 顧客対応関連／ナレッジベース関連／データ分析関連
+\begin{reqtable}{K{.20}P{.30}P{.20}P{.30}}{\reqth{項目} & \reqth{説明} & \reqth{必要性} & \reqth{データ交換の仕様}}
+【連携先1】 & 【インターフェースの説明】 & 【必要な理由】 & 【方式・認証・データ形式】 \\ \hline
+\end{reqtable}
+
+\reqlabel{【連携先の分類2】}
+\begin{reqtable}{K{.20}P{.30}P{.20}P{.30}}{\reqth{項目} & \reqth{説明} & \reqth{必要性} & \reqth{データ交換の仕様}}
+【連携先1】 & 【インターフェースの説明】 & 【必要な理由】 & 【方式・認証・データ形式】 \\ \hline
+\end{reqtable}
+
+\reqlabel{セキュリティ関連}
+\begin{reqtable}{K{.20}P{.30}P{.20}P{.30}}{\reqth{項目} & \reqth{説明} & \reqth{必要性} & \reqth{プロトコル・認証方法}}
+【項目1】 & 【インターフェースの説明】 & 【必要な理由】 & 【プロトコル・認証方法】 \\ \hline
+\end{reqtable}
+
+%==============================================================================
+% 4. 非機能要件（サンプルp.18-39）
+%   各表は「項目 | 説明 | 具体的な要件」(reqitems)．■ブロックは必要なものだけ残す
+%==============================================================================
+\section{非機能要件}
+
+\subsection{ユーザビリティおよびアクセシビリティ}
+\reqlabel{ユーザビリティ要件}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{アクセシビリティ要件}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\subsection{システム方式}
+\reqlabel{システムアーキテクチャ}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{データベース}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{ネットワーク}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{セキュリティ}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{バックアップとリカバリ}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{モニタリングとロギング}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\subsection{規模}
+\reqlabel{ユーザー数}
+\begin{reqitems}
+【項目】 & 【説明】 & 【具体的な要件】 \\ \hline
+\end{reqitems}
+
+\reqlabel{データ件数}
+\begin{reqitems}
+【項目】 & 【説明】 & 【具体的な要件】 \\ \hline
+\end{reqitems}
+
+\reqlabel{トランザクション数}
+\begin{reqitems}
+【項目】 & 【説明】 & 【具体的な要件】 \\ \hline
+\end{reqitems}
+
+\subsection{性能}
+\reqlabel{レスポンスタイム（応答時間）}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{スループット}
+\begin{reqitems}
+【項目】 & 【説明】 & 【具体的な要件】 \\ \hline
+\end{reqitems}
+
+\reqlabel{バッチ処理}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{レイテンシー}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{スケーラビリティ}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\subsection{信頼性}
+\reqlabel{可用性}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{障害対応}
+\begin{reqitems}
+【項目】 & 【説明】 & 【具体的な要件】 \\ \hline
+\end{reqitems}
+
+\reqlabel{フェイルオーバー}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{データの一貫性と耐久性}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{モニタリングとアラート}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{定期メンテナンス}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{冗長化}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{バックアップとリカバリ}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\subsection{拡張性}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\subsection{互換性}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\subsection{継続性}
+\reqlabel{冗長化}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{バックアップとリカバリ}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{サービスレベルアグリーメント（SLA）}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{ビジネス継続計画（BCP）}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\subsection{セキュリティ}
+\reqlabel{データ保護}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{認証と認可}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{ネットワークセキュリティ}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{脆弱性管理}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\subsection{稼働環境}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\subsection{テスト}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\subsection{移行}
+% サンプルの注記: システムリプレイス時など、必要な場合のみ記載する（不要ならこの節ごと削除）
+\reqlabel{データ移行}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{移行プロセス}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{移行テスト}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{移行後サポート}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{リスク管理}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\subsection{引継ぎ}
+\reqlabel{ドキュメント作成}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{トレーニングと教育}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{サポート体制}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{コミュニケーション}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\subsection{教育}
+\reqlabel{ユーザートレーニング}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{トレーニング教材}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{トレーニングプログラムの実施}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\subsection{運用}
+\reqlabel{運用体制}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{運用手順}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{モニタリングとアラート}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{バックアップとリカバリ}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{定期メンテナンス}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{運用レポート}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{運用ツール}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{コミュニケーション}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\subsection{保守}
+\reqlabel{保守体制}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{保守手順}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{障害対応}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{ハードウェア保守}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{ソフトウェア保守}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{保守記録}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{外部ベンダー管理}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+\reqlabel{保守ツール}
+\begin{reqitems}
+【項目】 & 【説明】 & ・【具体的な要件1】\par・【具体的な要件2】 \\ \hline
+\end{reqitems}
+
+%==============================================================================
+% 5. 補足（サンプルp.40）
+%==============================================================================
+\section{補足}
+
+\subsection{プロジェクト　スケジュール}
+\begin{figure}[H]
+  \begin{center}
+    \reqimage{assets/project-schedule.png}
+    \caption{プロジェクトスケジュール}
+    \label{fig:project-schedule}
+  \end{center}
+\end{figure}
+
+\subsection{プロジェクト　体制}
+\begin{figure}[H]
+  \begin{center}
+    \reqimage{assets/project-organization.png}
+    \caption{プロジェクト体制}
+    \label{fig:project-organization}
+  \end{center}
+\end{figure}
+
+\begin{flushright}
+以上
+\end{flushright}
+
+% 参考文献が必要な場合は，.bib を用意して以下を有効にする（\cite{キー} で本文から引用）
+%\bibliographystyle{jplain}
+%\bibliography{requirements-template} % .bib拡張子を除いたファイル名
+
+\end{document}
